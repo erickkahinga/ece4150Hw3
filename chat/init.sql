@@ -1,0 +1,30 @@
+# TODO add any additional tables here
+
+CREATE TABLE Chatroom (
+    chatroom_id INT AUTO_INCREMENT PRIMARY KEY,
+    chatroom_name VARCHAR(80) NOT NULL,
+    description VARCHAR(200)
+);
+
+CREATE TABLE ChatroomMembers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    chatroom_id INT NOT NULL,
+    profile_id INT NOT NULL,
+    FOREIGN KEY (chatroom_id) REFERENCES Chatroom(chatroom_id)
+);
+
+CREATE TABLE ChatroomMessages (
+    message_id INT AUTO_INCREMENT PRIMARY KEY,
+    chatroom_id INT NOT NULL,
+    sent_by INT NOT NULL,
+    message VARCHAR(500) NOT NULL,
+    timestamp DATETIME NOT NULL,
+    FOREIGN KEY (chatroom_id) REFERENCES Chatroom(chatroom_id)
+);
+
+
+CREATE TABLE Auth (
+    profile_id INT PRIMARY KEY,
+    access_token VARCHAR(500) NOT NULL
+);
+

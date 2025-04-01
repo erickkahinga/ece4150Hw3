@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 style="text-align: center">Chatroom name: {{ room.chatroom_name }}</h1>
+<p class="chatroom-description">Chatroom description: {{ room.description }}</p>
+
+
+<ul id="messages" class="messages-list">
+  {% for msg in messages %}
+      <li class="message-item" style="background-color: {{ msg.color }};">
+          <small class="message-timestamp">({{ msg.timestamp }})</small>
+          <strong class="message-username">{{ msg.username }}: <!-- <b>(ID: {{ msg.user }})</b> --></strong> 
+          <span class="message-text">{{ msg.message }}</span>
+      </li>
+  {% endfor %} <!-- Close the for loop -->
+</ul>
+
+  <div class="form-group">
+    <form id="message-form"  method="post" class="message-form" >
+    <label for="message">Message:</label>
+    <div>You are logged in as <code>{{username}}</code>.</div>
+
+    <input type="text" id="message" name="message" required class="form-input"><br><br>
+    <button type="submit" class="button">Send</button>
+
+    <label for="files" class="button" style="display:inline-block; color:#fff">Upload picture</label>
+    <input onchange="uploadFile(this)" type="file" id="files" name="myfile" accept="image/png, image/jpeg" multiple style="display: none">
+
+    </form>
+
+  </div>
+
+<a href="{{ url_for('chatrooms', profile_id=request.args.get('profile_id'), access_token=request.args.get('access_token')) }}" class="button">Back to Chatrooms</a>
+
+
+<!-- Include Socket.IO -->
+<script>
+
+  // Join the chatroom's Redis channel
+  const roomName = "{{ room.chatroom_name }}";
+  const username = "{{ username }}";
+  const room_id = {{ room_id }};
+
+  function uploadFile(input) {
+    alert("File upload not implemented yet");
+    for (let file of input.files) {
+        const filename = file['name'];
+        const filereader = new FileReader();
+        filereader.onload = function(e) {
+            const data = e.target.result;
+            console.log("Loaded file", filename, data);
+        };
+        filereader.readAsDataURL(file);
+    }
+  }
+
+  function refresh() {
+      fetch(`/chatroom_refresh/${room_id}?`+ new URLSearchParams({ 
+          profile_id: {{ profile_id }},
+          access_token: "{{ request.args.get('access_token') }}"  
+      })).then(response => response.json()).then(messages => {
+          const message_list = document.getElementById('messages');
+          let text = "";
+          for (let msg of messages) {
+              text += 
+                `<li class="message-item" style="background-color: ${ msg.color };">
+                    <small class="message-timestamp">(${ msg.timestamp })</small>
+                    <strong class="message-username">${ msg.username }: <!-- <b>(ID: ${ msg.user })</b> --></strong> 
+                    <span class="message-text">${ msg.message }</span>
+                </li>`;
+          }
+          message_list.innerHTML = text;
+      });
+  }
+
+  const REFRESH_TIMEOUT = 1000; // one second polling interval
+
+  // auto refresh
+  let timer = undefined;
+  const startTimer = () => {
+      if (timer !== undefined)
+          clearTimeout(timer);
+      refresh();
+      timer = setTimeout(startTimer, REFRESH_TIMEOUT);
+  };
+  timer = setTimeout(startTimer, REFRESH_TIMEOUT);
+
+  // Handle form submission to send a message
+  const form = document.getElementById("message-form");
+  form.addEventListener("submit", function(event) {
+      event.preventDefault(); // Prevent page reload
+
+      const messageInput = document.getElementById("message");
+      const messageText = messageInput.value;
+
+      fetch("/send_message?" + new URLSearchParams({ 
+          profile_id: {{ profile_id }},
+          access_token: "{{ request.args.get('access_token') }}"  
+      }), {
+        method: 'POST',
+        credentials: "same-origin",
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': "{{ csrf_token() }}"
+        },
+        body: JSON.stringify({
+          room_id: room_id,
+          username: username,
+          message: messageText,  
+        })
+      }).catch(error => alert(error.message))
+       .then(result => {
+          if (result.ok) {
+            startTimer();
+          } else {
+            alert(result.statusText);
+          }
+       });
+
+      // Clear the input field
+      messageInput.value = "";
+  });
+
+
+</script>
+
+{% endblock %}

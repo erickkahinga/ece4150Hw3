@@ -1,0 +1,127 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Chat on EC2"
+Parameters:
+  KeyPairName:
+    Type: "String"
+    Description: "This is the name of the EC2 key pair you created. The value you enter here must match exactly the name given when you created the key pair." 
+Resources:
+
+  # Security Group
+  ECE4150Lab2SecurityGroup:
+      Type: "AWS::EC2::SecurityGroup"
+      Properties:
+        GroupDescription: "Allow SSH and MySQL traffic from anywhere"
+        VpcId: !Ref DefaultVPC
+        SecurityGroupIngress:
+          - IpProtocol: "tcp"
+            FromPort: 22
+            ToPort: 22
+            CidrIp: "0.0.0.0/0"  # Allow SSH from anywhere
+          - IpProtocol: "tcp"
+            FromPort: 3306
+            ToPort: 3306
+            CidrIp: "0.0.0.0/0"  # Allow MySQL access from anywhere
+          - IpProtocol: "tcp"
+            FromPort: 5000
+            ToPort: 5005
+            CidrIp: "0.0.0.0/0"  # Allow custom port access from anywhere
+
+  # Default VPC
+  DefaultVPC:
+      Type: "AWS::EC2::VPC"
+      Properties:
+        CidrBlock: "10.0.0.0/16"
+        EnableDnsSupport: true
+        EnableDnsHostnames: true
+
+  VPCInternetGateway:
+      Type: "AWS::EC2::InternetGateway"
+      Properties: {}
+    
+  AttachGatewayToVPC:
+      Type: "AWS::EC2::VPCGatewayAttachment"
+      Properties:
+        VpcId: !Ref DefaultVPC
+        InternetGatewayId: !Ref VPCInternetGateway
+
+# Route Table
+  RouteTable:
+      Type: "AWS::EC2::RouteTable"
+      Properties:
+        VpcId: !Ref DefaultVPC
+        Tags:
+          - Key: "Name"
+            Value: "PublicRouteTable"
+
+  PublicRoute:
+      Type: "AWS::EC2::Route"
+      Properties:
+        RouteTableId: !Ref RouteTable
+        DestinationCidrBlock: "0.0.0.0/0"
+        GatewayId: !Ref VPCInternetGateway
+
+  # Default Subnets
+  DefaultSubnet:
+      Type: "AWS::EC2::Subnet"
+      Properties:
+        VpcId: !Ref DefaultVPC
+        CidrBlock: "10.0.1.0/24"
+        AvailabilityZone: "us-east-1a"
+        MapPublicIpOnLaunch: true
+        Tags:
+          - Key: "Name"
+            Value: "PublicSubnet1"
+
+  DefaultSubnet2:
+      Type: "AWS::EC2::Subnet"
+      Properties:
+        VpcId: !Ref DefaultVPC
+        CidrBlock: "10.0.2.0/24"
+        AvailabilityZone: "us-east-1b"
+        MapPublicIpOnLaunch: true
+        Tags:
+          - Key: "Name"
+            Value: "PublicSubnet2"
+
+  SubnetRouteTableAssociation1:
+      Type: "AWS::EC2::SubnetRouteTableAssociation"
+      Properties:
+        SubnetId: !Ref DefaultSubnet
+        RouteTableId: !Ref RouteTable
+
+  SubnetRouteTableAssociation2:
+      Type: "AWS::EC2::SubnetRouteTableAssociation"
+      Properties:
+        SubnetId: !Ref DefaultSubnet2
+        RouteTableId: !Ref RouteTable
+
+
+  # EC2 Instance
+  MyEC2Instance:
+      Type: "AWS::EC2::Instance"
+      Properties:
+        InstanceType: "t2.small"
+        ImageId: "ami-005fc0f236362e99f"  # Ubuntu
+        KeyName: !Ref KeyPairName
+        SecurityGroupIds:
+          - !Ref ECE4150Lab2SecurityGroup  # Attach the custom security group
+        SubnetId: !Ref DefaultSubnet  # Use default subnet
+        Tags:
+          - Key: "Name"
+            Value: "ECE4150-Lab3-EC2"
+        BlockDeviceMappings:
+          - DeviceName: "/dev/xvda"
+            Ebs:
+              VolumeSize: 10  # Default root volume size in GiB
+              VolumeType: "gp2"
+
+  
+Outputs:
+    EC2InstancePublicIP:
+      Description: "Public IP of the EC2 instance"
+      Value: !GetAtt MyEC2Instance.PublicIp
+
+    EC2InstancePublicDNS:
+      Description: "Public DNS name of the EC2 instance"
+      Value: !GetAtt MyEC2Instance.PublicDnsName
+
