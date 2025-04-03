@@ -28,3 +28,11 @@ CREATE TABLE Auth (
     access_token VARCHAR(500) NOT NULL
 );
 
+# For profiles table
+CREATE TABLE profiles (
+    profile_id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    biography TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
