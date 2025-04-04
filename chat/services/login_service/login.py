@@ -1,6 +1,7 @@
 from flask import Flask, request, render_template, redirect, url_for, jsonify, make_response
 import requests 
 import os
+import sys
 
 app = Flask(__name__)
 
@@ -28,7 +29,13 @@ def register():
     })
 
     if profile_response.status_code != 200:
-        return profile_response.text
+        print(f"profile_response.status_code: {profile_response.status_code}", file=sys.stderr)
+        if profile_response.status_code == 400:
+            return render_template("register_bad_field_blank.html")
+        elif profile_response.status_code == 500:
+            return render_template("register_bad_username_taken.html")
+        else:
+            return profile_response.text
 
     profile_data = profile_response.json()
     profile_id = profile_data.get("profile_id")
@@ -52,8 +59,14 @@ def login():
         "user_name": username,
         "password": password
     })
+    
     profile_response = profile_response.json()
-    profile_id = profile_response["profile_id"]
+    
+    try:
+        profile_id = profile_response["profile_id"]
+    except:
+        print(f"profile response: {profile_response}", file=sys.stderr)
+        return render_template('login_bad.html')
 
     if profile_id:
 
@@ -70,7 +83,26 @@ def login():
     # If profile ID or access token is not found, redirect back to login page
     return render_template('login.html', app_message="Login failed")
 
+@app.route("/logout", methods=["GET"])
+def logout():
+    access_token = request.args.get("access_token")
+    if not access_token:
+        print(f"error: Access token missing, 400", file=sys.stderr)
+        return redirect(url_for('login'))
+    
+    print(f"access token: {access_token}", file=sys.stderr)
+    
+    auth_url = f"http://auth_service/remove_token?access_token={access_token}"
 
+    try:
+        response = requests.get(auth_url)
+        if response.status_code == 200:
+            print(f"message: Logged out successfully {response.status_code}", file=sys.stderr)
+            return redirect(url_for('login'))
+        else:
+            return jsonify({"error": "Logout failed", "details": response.json()}), response.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, abort
 from uuid import uuid4
 import os
 import pymysql
+import sys
 
 app = Flask(__name__)
 
@@ -110,6 +111,28 @@ def retrieve_token():
         abort(404, description="No token found for the given profile_id")
 
     return jsonify({"access_token": auth_record['access_token']})
+
+@app.route("/remove_token", methods=["GET"])
+def remove_token():
+    access_token = request.args.get("access_token")
+    if not access_token:
+        return jsonify({"error": "Access token missing"}), 400
+    
+    connection = db_connect()
+    
+    try:
+        with connection.cursor() as cursor:
+            sql = "DELETE FROM Auth WHERE access_token=%s"
+            cursor.execute(sql, (access_token,))
+        connection.commit()
+        return jsonify({"message": "Access token removed"}), 200
+    except pymysql.MySQLError as e:
+        print(f"Error removing access token: {e}", file=sys.stderr)
+        return jsonify({"error": "Database error"}), 500
+    finally:
+        connection.close()
+
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=80)
